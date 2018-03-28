@@ -1,33 +1,33 @@
+#encoding:UTF-8
 import sys
 import argparse
 import glob
 import numpy as np
+import chainer
 import chainer.links as L
 import chainer.functions as F
-import chainer
 from chainer import cuda, Variable, optimizers, Chain, datasets, training
 from chainer.training import extensions
 
 parser = argparse.ArgumentParser(description='Chainer 3D Autoencoder')
 parser.add_argument('--epoch', '-e', type=int, default=20,help='エポック数')
-parser.add_argument('--dir', '-d', help='読み込むディレクトリ')
+parser.add_argument('--dir', '-d', help='読み込むディレクトリ', default='data01')
 parser.add_argument('--dropout', '-r', default=0.25, type=float, help='Dropoutの割合')
 args = parser.parse_args()
 epoch = args.epoch
 dirname = args.dir
 
 # 学習フォルダのディレクトリを指定する
-files = glob.glob(dirname + "/*.dat")
+files = glob.glob(dirname + "/*.npy")
 train = []
 for f in files:
     try:
-        b = open(f, 'br').read()
+        ct_data = np.load(f)
+        ct_data = ct_data.astype(np.float32) # chainer use float32
     except:
         print("cannot open : " + f)
-    train_data = np.fromstring(b, dtype=np.uint8)
-    train_data = train_data.reshape(1,11,11,11)
-    train_data = train_data.astype(np.float32)
-    train.append(train_data)
+    train.append(ct_data)
+
 
 # データセットの作成
 train = datasets.TupleDataset(train,train)
@@ -45,8 +45,6 @@ class Autoencoder(Chain):
     def __call__(self, x):
         h = F.relu(self.conv1(x))
         h = F.max_pooling_nd(h,(2,2,2))
-        if self.drop:
-          h = F.dropout(h, ratio=args.dropout)
         h = F.unpooling_nd(h,(2,2,2))
         h = F.relu(self.dcnv1(h))
         return h
